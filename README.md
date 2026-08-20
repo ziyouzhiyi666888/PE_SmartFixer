@@ -63,6 +63,8 @@ PE_SmartFixer_v1.0.zip
 ✅ 修复因关键系统服务被禁用导致的启动失败
 
 ✅ 补全缺失或损坏的系统驱动文件（如 iaStorV.sys 等）
+<img width="1267" height="659" alt="QQ拼音截图未命名" src="https://github.com/user-attachments/assets/c472b0eb-2ba7-42a3-8de9-a27feb41dc4c" />
+<img width="1160" height="620" alt="image" src="https://github.com/user-attachments/assets/d4a1affd-b30f-42cd-8a7a-46fc241d2eaa" />
 
 ✅ 修复因第三方优化工具误改注册表导致的系统崩溃
 
