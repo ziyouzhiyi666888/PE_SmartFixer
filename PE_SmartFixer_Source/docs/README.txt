@@ -19,13 +19,7 @@
 2. **蓝屏 DUMP 文件解析**：离线扫描 `.dmp` 文件，联合视觉进行双重诊断。
 3. **PECMD/INI 启动项智能优化**：扩展底层模块，支持对原系统外置加载项进行智能重组。
 
-## 📦 下载地址
 
-- 百度网盘：https://pan.baidu.com/s/xxxxxx
-- 蓝奏云：https://wwi.lanzoup.com/xxxxxx
-- GitHub Releases：https://github.com/你的用户名/PE-SmartFixer/releases
-
----
 
 ## 📖 使用说明
 
