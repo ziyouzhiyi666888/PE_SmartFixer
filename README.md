@@ -18,6 +18,8 @@
 1. **本地离线视觉模型适配**：支持 MiniCPM-V / LLaVA 等轻量模型，实现无网环境下的视觉诊断。
 2. **蓝屏 DUMP 文件解析**：离线扫描 `.dmp` 文件，联合视觉进行双重诊断。
 3. **PECMD/INI 启动项智能优化**：扩展底层模块，支持对原系统外置加载项进行智能重组。
+<img width="1267" height="659" alt="QQ拼音截图未命名" src="https://github.com/user-attachments/assets/93055475-8a05-45c9-a82c-8d3caf41d51a" />
+<img width="1160" height="620" alt="image" src="https://github.com/user-attachments/assets/a4524415-a7a5-4a10-aaf2-945f45c5d601" />
 
 
 ---
@@ -63,8 +65,6 @@ PE_SmartFixer_v1.0.zip
 ✅ 修复因关键系统服务被禁用导致的启动失败
 
 ✅ 补全缺失或损坏的系统驱动文件（如 iaStorV.sys 等）
-<img width="1267" height="659" alt="QQ拼音截图未命名" src="https://github.com/user-attachments/assets/c472b0eb-2ba7-42a3-8de9-a27feb41dc4c" />
-<img width="1160" height="620" alt="image" src="https://github.com/user-attachments/assets/d4a1affd-b30f-42cd-8a7a-46fc241d2eaa" />
 
 ✅ 修复因第三方优化工具误改注册表导致的系统崩溃
 
