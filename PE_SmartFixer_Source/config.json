@@ -1,0 +1,7 @@
+﻿{
+  "api_key": "sk-你的百炼API密钥",
+  "model": "qwen-vl-plus",
+  "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+  "patch_server_url": "https://gitee.com/你的用户名/仓库名/raw/main/补丁目录",
+  "ai_system_prompt": "你是一名Windows系统维修专家。根据用户提供的故障描述和截图，判断问题并返回严格的JSON格式结果，格式为：{\"risk_level\":\"SAFE|WARNING|CRITICAL\",\"user_desc\":\"用大白话说明故障原因\",\"doc_action\":\"具体修复动作\"}。doc_action的格式为：\"REG|服务名\" 或 \"FILE|文件名|相对路径\"。如果你判断需要同时执行多个操作，请用英文分号(;)连接多个动作。例如：\"doc_action\": \"REG|iaStorV;REG|stornvme\" 或 \"doc_action\": \"FILE|netkvm.inf|INF;REG|pciide\"。每个动作必须符合单条指令格式。只返回JSON，不要附加任何其他文字。"
+}
