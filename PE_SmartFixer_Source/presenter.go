@@ -61,7 +61,7 @@ func RenderWindowForUser(jsonFromAI string) {
 		title := "🔧 安全修复建议 (SAFE)"
 		msg := "故障原因: " + pr.UserDesc + "\n\n是否执行修复操作？"
 		ret := messageBox(title, msg, 0x24) // MB_YESNO|MB_ICONQUESTION
-		if ret == 6 {                      // IDYES
+		if ret == 6 {                       // IDYES
 			ExecuteSurgery(pr.DocAction)
 		} else {
 			messageBox("操作取消", "已取消修复", 0x40)
@@ -70,7 +70,7 @@ func RenderWindowForUser(jsonFromAI string) {
 		title := "⚠️ 警告修复建议 (WARNING)"
 		msg := "故障原因: " + pr.UserDesc + "\n\n是否执行修复操作？"
 		ret := messageBox(title, msg, 0x34) // MB_YESNO|MB_ICONWARNING
-		if ret == 6 {                      // IDYES
+		if ret == 6 {                       // IDYES
 			ExecuteSurgery(pr.DocAction)
 		} else {
 			messageBox("操作取消", "已取消修复", 0x40)
@@ -84,7 +84,7 @@ func RenderWindowForUser(jsonFromAI string) {
 		}
 		msg += "\n\n⚠️ 高危问题可能涉及硬件损坏，强烈建议先备份数据！\n是否仍然执行修复？"
 		ret := messageBox(title, msg, 0x34) // MB_YESNO|MB_ICONWARNING
-		if ret == 6 {                      // IDYES
+		if ret == 6 {                       // IDYES
 			ExecuteSurgery(pr.DocAction)
 		} else {
 			messageBox("操作取消", "已取消修复，请尽快备份数据！", 0x40)
@@ -118,8 +118,12 @@ func ExecuteSurgery(docAction string) {
 			}
 		}
 		if len(failed) == 0 {
+			recordFixRound(docAction) // 本轮修复已落地，写入硬盘黑匣子
 			messageBox("全部操作成功", fmt.Sprintf("共 %d 个操作全部完成", successCount), 0x40)
 		} else {
+			if successCount > 0 {
+				recordFixRound(docAction) // 有实际写入即记录本轮
+			}
 			msg := fmt.Sprintf("成功 %d 个，失败 %d 个:\n%s", successCount, len(failed), strings.Join(failed, "\n"))
 			messageBox("部分操作失败", msg, 0x10)
 		}
@@ -130,8 +134,36 @@ func ExecuteSurgery(docAction string) {
 	if err := executeSingleSurgery(docAction); err != nil {
 		messageBox("操作失败", err.Error(), 0x10)
 	} else {
+		recordFixRound(docAction) // 本轮修复已落地，写入硬盘黑匣子
 		messageBox("操作成功", "修复完成", 0x40)
 	}
+}
+
+// validServiceName 校验 Windows 服务名：只允许字母、数字、下划线、点、连字符
+func validServiceName(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		ok := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '.' || r == '-'
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// validFileName 校验文件名：不允许路径分隔符和 Windows 非法字符
+func validFileName(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r == '\\' || r == '/' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
+			return false
+		}
+	}
+	return true
 }
 
 // parseDocAction 解析工单指令，返回前缀及校验错误（不执行实际手术）
@@ -146,10 +178,18 @@ func parseDocAction(docAction string) (string, error) {
 		if len(parts) > 2 {
 			return prefix, fmt.Errorf("REG 指令格式错误: %s\n正确格式: REG|服务名\n如需修复文件请用: FILE|文件名|相对路径", docAction)
 		}
+		service := strings.TrimSpace(parts[1])
+		if !validServiceName(service) {
+			return prefix, fmt.Errorf("REG 服务名含非法字符: %q\n服务名只允许字母、数字、下划线、点、连字符", service)
+		}
 		return prefix, nil
 	case "FILE":
 		if len(parts) < 3 {
 			return prefix, fmt.Errorf("FILE 工单缺少相对路径参数: %s\n正确格式: FILE|文件名|相对路径", docAction)
+		}
+		fileName := strings.TrimSpace(parts[1])
+		if !validFileName(fileName) {
+			return prefix, fmt.Errorf("FILE 文件名含非法字符: %q\n文件名不允许包含 \\ / : * ? \" < > |", fileName)
 		}
 		return prefix, nil
 	default:

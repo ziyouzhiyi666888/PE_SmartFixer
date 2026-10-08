@@ -1,0 +1,9 @@
+# 本地构建与发布暂存目录（不纳入版本控制）
+# 正式发布包见仓库根目录 PE_SmartFixer_Release_v1.1.zip
+release_stage/
+
+# 构建与调试产物
+*.tmp
+pe_debug.log
+cover.out
+cover

@@ -1,6 +1,8 @@
 [README_EN.md.md](https://github.com/user-attachments/files/31334093/README_EN.md.md)
 # 🚀 PE-SmartFixer: AI-Powered Multimodal Vision & Offline Registry Surgery Tool for WinPE
 
+`Version: v1.1` │ `Target: WinPE` │ `Core: Pure Go (zero deps)` │ `Brain: Qwen-VL` │ `License: GPL-3.0`
+
 PE-SmartFixer completely revolutionizes the traditionally fractured experience of WinPE maintenance, which heavily relied on manual documentation lookups and script hacking. By leveraging Large Multimodal Models (LMM/VLM) as the intelligent diagnostic gateway, paired with Go's low-level hardware orchestration, it achieves a "Vision-to-Diagnosis, One-Click Direct Fix" paradigm.
 
 > 💡 **Maintainer's Note**: The core architecture of Win32 asynchronous message loops, message dispatching, and offline registry hive mounting has been fully closed-loop. Due to high cloud token consumption, this project is now fully open-sourced. We invite global Go developers and Windows systems experts to collaborate on our upcoming v2.0 evolution!
@@ -20,6 +22,66 @@ PE-SmartFixer completely revolutionizes the traditionally fractured experience o
 - ✅ Fixes `0x0000007B` BSOD caused by storage mode switching (AHCI/RAID/IDE) via offline hive manipulation.
 - ✅ Restores critical boot-essential system services accidentally disabled by malware or optimization tools.
 - ✅ Automatic patching of missing or corrupted core storage drivers (e.g., `iaStorV.sys`).
+
+---
+
+## 🧠 v1.1 — Long-Term Memory & Multi-Stage Adaptive Risk Fusing
+
+> v1.1 turns the tool from a stateless one-shot repair utility into a **self-adapting repair system with persistent memory**. All new code relies exclusively on the Go standard library, so the binary size is essentially unchanged (amd64: 4.93 MB) and the project remains **100% dependency-free**.
+
+### 1. On-Disk Black Box (Long-Term Memory)
+
+- After every applied repair round, the tool writes `X:\Windows\pe_fix_memory.json` on the **target** system drive (never on the PE itself):
+  `{"last_repair_time":"YYYY-MM-DD HH:MM:SS","diagnose_count":X,"last_action":"REG|a;REG|b"}`
+- **Atomic write**: content is written to a `.tmp` file and then renamed, so a power loss can never leave a half-written record.
+- **Per-machine isolation**: the record travels with the target disk and never pollutes other machines.
+- **Forward compatible**: tolerates a UTF-8 BOM and ignores unknown fields.
+- **Exact de-duplication**: actions are compared token-by-token (a substring match can no longer swallow `REG|iaStor` into `REG|iaStorV`).
+
+### 2. Multi-Stage Adaptive Risk Fusing
+
+- **24-hour active defence**: on startup, if the last repair is older than 24 hours the system assumes the previous fix succeeded, **deletes the record** and returns to a clean first diagnosis.
+- **Hard fuse after 3 consecutive failures**: within 24 hours, `diagnose_count >= 3` makes the tool intercept **locally and issue no network request at all** (saving tokens). The main UI shows a blood-red high-risk warning and locks the "Start Diagnosis" button.
+- **Clock-skew safe**: if a dead CMOS battery pushed the clock into the future, the record is treated as *not expired* — conservative fusing, never a free pass.
+
+### 3. Asymmetric Pre-Flight Transaction Rollback
+
+- On startup the tool parses previously failed `REG|<service>` tickets and, **before the AI is consulted again**, restores the previous `Start` value: `reg load` the target SYSTEM hive → **rewrite the path** → `reg import` → `reg unload`.
+- ⚠️ **Implementation detail that matters**: paths inside the backup `.reg` are *online* paths (`HKLM\SYSTEM\...`). Importing that file directly only modifies **the PE's own registry**. v1.1 rewrites the mount point (`SYSTEM` → `SysTemp`) so the restore truly lands on the offline target hive — and aborts the rollback if the rewrite fails, rather than silently writing to the wrong place.
+- **Non-blocking**: the rollback outcome is merged into the main window text instead of a modal dialog that would stall startup.
+
+### 4. In-Memory Negative Constraint Prompt
+
+- The static `config.json` is **never rewritten**; the historical failure ticket is evaluated at runtime.
+- A "historical intensive-care record" is appended to the `systemPrompt`, forcing the model to **seal off every previously failed path**, discard its earlier hypotheses and change its reasoning dimension.
+- Special characters (`%`, quotes, backslashes) in the ticket cannot corrupt the prompt.
+
+### 5. Four-Layer Safety Whitelist (defends against wrong AI instructions)
+
+| Layer | Purpose | Blocked example |
+|-------|---------|-----------------|
+| Instruction format | `REG\|service` (max 2 segments) / `FILE\|name\|relpath` (exactly 3) | `REG\|a\|b` |
+| **Service-name whitelist** | letters, digits, `_`, `.`, `-` only | `REG\|svc&calc` (command injection) |
+| **File-name whitelist** | rejects `\ / : * ? " < > \|` | `FILE\|a/b.sys\|drivers` |
+| **Path-traversal guard** | target must stay inside `X:\Windows\` | `FILE\|x\|..\..\..\Users` |
+
+> Validation runs twice — at parse time and again at execution time — so a bypassed first layer is still stopped before any directory is created or file written.
+
+### 6. Bug Fixes since v1.0
+
+- **🔴 32-bit build was completely unusable on 64-bit Windows.** Root cause: **WOW64 file-system redirection** maps `C:\Windows\System32` to `C:\Windows\SysWOW64` for 32-bit processes, and `SysWOW64\config\SYSTEM` does not exist — so the system drive could not be found (all repairs silently disabled) and repairs targeting `System32` would have written to `SysWOW64`. Fixed by calling `Wow64DisableWow64FsRedirection()` at startup.
+- **AI JSON containing Windows paths failed to parse** (`invalid character 'D' in string escape code` because `\D` is not a legal JSON escape). Illegal escapes are now repaired before parsing — idempotently, leaving `\n` / `\uXXXX` untouched.
+- **Placeholder hint text did not disappear on click.** Now uses focus-gained/focus-lost handling (a stock Edit control has no `EM_SETCUEBANNER` cue banner without a comctl32 v6 manifest).
+- **AI received an empty description** ("no input provided") because the status message was inserted *before* the user input was read and the cleanup pass then removed the trailing text. Reading now happens first, text length uses `GetWindowTextLengthW`, and unclosed marker lines are filtered.
+- **Registry modification continued even when its `.reg` backup failed** — a real data-safety hole. The mutation is now aborted when the backup cannot be written.
+- **Backup failure reasons are now localised in Chinese**: `Access is denied` → insufficient privileges, `write protected` → read-only media, `I/O error` / `CRC` → suspected bad sectors, etc. (9 categories).
+- **Robustness & quality**: 5-second timeouts on every registry command, DNS pre-flight before cloud downloads, `atomic.Pointer` for the cross-thread AI result (removing a theoretical data race), whole-project `gofmt`, zero `go vet` warnings, and **71 automated tests** (100% coverage of the pure logic functions).
+
+### 7. Known Limitations
+
+- A record timestamped *exactly* 24 hours ago is treated as slightly older than 24 hours (process start latency), i.e. it returns to a clean first diagnosis — the threshold semantics are `> 24h`.
+- The [WMP specification](WMP_SPEC_EN.md) has **no reference implementation yet**: no stdin/stdout JSON-RPC interface and no `wmp_manifest.json` in this project.
+- `CRITICAL` is now a **human-confirmed** action (high-risk warning plus the AI's suggested operations) rather than a hard block.
 
 ---
 

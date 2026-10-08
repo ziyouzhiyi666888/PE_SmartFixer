@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -13,6 +14,155 @@ import (
 	"strings"
 	"time"
 )
+
+// ---------- v1.1 硬盘黑匣子（长期记忆） ----------
+
+type FixMemory struct {
+	LastRepairTime string `json:"last_repair_time"`
+	DiagnoseCount  int    `json:"diagnose_count"`
+	LastAction     string `json:"last_action"`
+}
+
+// fixMemoryPath 黑匣子绝对路径：目标盘 Windows\pe_fix_memory.json
+func fixMemoryPath() string {
+	return targetDrive + ":\\Windows\\pe_fix_memory.json"
+}
+
+// parseFixMemory 解析黑匣子内容（容忍 UTF-8 BOM，避免误判损坏丢失病历）
+func parseFixMemory(data []byte) (FixMemory, error) {
+	var mem FixMemory
+	err := json.Unmarshal([]byte(strings.TrimPrefix(string(data), "\ufeff")), &mem)
+	return mem, err
+}
+
+// loadFixMemory 从指定路径读取黑匣子（容忍 BOM）
+func loadFixMemory(path string) (FixMemory, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return FixMemory{}, err
+	}
+	return parseFixMemory(data)
+}
+
+// writeFixMemory 原子化写入黑匣子（先写 .tmp 再改名，避免半截文件）
+func writeFixMemory(path string, mem FixMemory) error {
+	out, err := json.Marshal(mem)
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, out, 0644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+// containsAction 判断病历本是否已精确包含某条工单（按分号逐条比对，避免子串误判）
+func containsAction(history, action string) bool {
+	for _, a := range strings.Split(history, ";") {
+		if strings.TrimSpace(a) == action {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeFixMemory 合并一轮修复记录：计数+1，动作去重追加（纯函数，便于测试）
+func mergeFixMemory(mem FixMemory, action string, now time.Time) FixMemory {
+	mem.DiagnoseCount++ // 文件不存在时为 0→1，已存在则累加
+	if action != "" && !containsAction(mem.LastAction, action) {
+		if mem.LastAction != "" {
+			mem.LastAction += ";" + action
+		} else {
+			mem.LastAction = action
+		}
+	}
+	mem.LastRepairTime = now.Format("2006-01-02 15:04:05")
+	return mem
+}
+
+// recordFixRound 记录一轮修复：计数+1，动作并入病历本，原子写入目标盘
+// （一轮 = 一次诊断，多指令工单只计 1 次，避免计数虚高误触发熔断）
+func recordFixRound(action string) {
+	if targetDrive == "" || action == "" {
+		return
+	}
+	path := fixMemoryPath()
+	mem := FixMemory{}
+	if loaded, err := loadFixMemory(path); err == nil {
+		mem = loaded
+	}
+	_ = writeFixMemory(path, mergeFixMemory(mem, action, time.Now()))
+}
+
+// rewriteRegForOffline 把备份 .reg 的在线路径改写为离线挂载路径（纯函数，便于测试）
+// 备份文件里是 HKEY_LOCAL_MACHINE\SYSTEM\...（在线路径），直接 reg import 只会改到
+// PE 自身的注册表；改写为 HKLM\SysTemp\... 后，配合 reg load 才能真正写回目标系统。
+func rewriteRegForOffline(content string) string {
+	return strings.ReplaceAll(content,
+		`HKEY_LOCAL_MACHINE\SYSTEM\`,
+		`HKEY_LOCAL_MACHINE\SysTemp\`)
+}
+
+// rewriteRegForOfflineSafe 改写并做防御校验：若仍残留在线路径（大小写异常/格式异常）
+// 则报错中止 —— 宁可放弃自动回滚，也绝不能把键值写进 PE 自己的注册表。
+func rewriteRegForOfflineSafe(content string) (string, error) {
+	fixed := rewriteRegForOffline(content)
+	if strings.Contains(strings.ToUpper(fixed), `HKEY_LOCAL_MACHINE\SYSTEM\`) {
+		return "", fmt.Errorf("备份文件路径改写失败（含未识别的在线路径），已中止回滚以防写错注册表")
+	}
+	return fixed, nil
+}
+
+// RestoreRegistryStart 非对称事务回滚：把备份 .reg 里的启动键值原子化复原到目标盘
+func RestoreRegistryStart(driveLetter string, service string) error {
+	hive := driveLetter + ":\\Windows\\System32\\config\\SYSTEM"
+	backup := driveLetter + ":\\Windows\\" + service + "_Start_backup.reg"
+
+	if _, err := os.Stat(hive); err != nil {
+		return fmt.Errorf("SYSTEM 配置单元不存在: %w", err)
+	}
+	data, err := os.ReadFile(backup)
+	if err != nil {
+		return fmt.Errorf("备份文件读取失败: %w", err)
+	}
+
+	// 关键一步：路径改写 + 防御校验（改写失败则中止，避免写错注册表）
+	fixed, err := rewriteRegForOfflineSafe(string(data))
+	if err != nil {
+		return err
+	}
+
+	tmp := filepath.Join(os.TempDir(), "pe_rollback_tmp.reg")
+	if err := os.WriteFile(tmp, []byte(fixed), 0644); err != nil {
+		return fmt.Errorf("临时回滚文件写入失败: %w", err)
+	}
+	defer os.Remove(tmp)
+
+	ctxLoad, cancelLoad := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelLoad()
+	if out, err := exec.CommandContext(ctxLoad, "cmd.exe", "/c", "reg", "load",
+		`HKLM\SysTemp`, hive).CombinedOutput(); err != nil {
+		return fmt.Errorf("回滚挂载失败: %s, out: %s", err, string(out))
+	}
+	defer func() {
+		ctxUnload, cancelUnload := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelUnload()
+		_ = exec.CommandContext(ctxUnload, "cmd.exe", "/c", "reg", "unload", `HKLM\SysTemp`).Run()
+	}()
+
+	ctxImp, cancelImp := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelImp()
+	if out, err := exec.CommandContext(ctxImp, "cmd.exe", "/c", "reg", "import",
+		tmp).CombinedOutput(); err != nil {
+		return fmt.Errorf("回滚导入失败: %s, out: %s", err, string(out))
+	}
+	return nil
+}
 
 // explainBackupError 将备份失败的系统错误转换为中文说明，便于用户理解
 func explainBackupError(err error) string {
@@ -150,24 +300,24 @@ func FixRegistryOffline(driveLetter string, targetService string) error {
 	driveLetterOnly := driveLetter[:1]
 	msg := fmt.Sprintf(
 		"服务 %s 已修改为自动启动。\n\n备份文件已保存至：\n%s\n\n"+
-		"注意：该备份文件不能在 PE 中直接双击导入（会修改 PE 自身注册表）。\n"+
-		"如需回滚，请在 PE 中执行以下步骤：\n"+
-		"1. 打开注册表编辑器（regedit）\n"+
-		"2. 选中 HKEY_LOCAL_MACHINE，点击“文件” → “加载配置单元”\n"+
-		"3. 选择 %s:\\Windows\\System32\\config\\SYSTEM，加载为 HKLM\\Offline\n"+
-		"4. 将 HKLM\\Offline\\%s\\Services\\%s\\Start 修改为备份文件中的原值（%s）\n"+
-		"5. 选中 HKLM\\Offline，点击“文件” → “卸载配置单元”",
-		targetService, backupFile, driveLetterOnly, controlSet, targetService, currentStart)
-	if currentStart == "" {
-		msg = fmt.Sprintf(
-			"服务 %s 已修改为自动启动。\n\n备份文件已保存至：\n%s\n\n"+
 			"注意：该备份文件不能在 PE 中直接双击导入（会修改 PE 自身注册表）。\n"+
 			"如需回滚，请在 PE 中执行以下步骤：\n"+
 			"1. 打开注册表编辑器（regedit）\n"+
 			"2. 选中 HKEY_LOCAL_MACHINE，点击“文件” → “加载配置单元”\n"+
 			"3. 选择 %s:\\Windows\\System32\\config\\SYSTEM，加载为 HKLM\\Offline\n"+
-			"4. 将 HKLM\\Offline\\%s\\Services\\%s\\Start 修改为备份文件中的原值（备份文件中为 dword:00000003）\n"+
+			"4. 将 HKLM\\Offline\\%s\\Services\\%s\\Start 修改为备份文件中的原值（%s）\n"+
 			"5. 选中 HKLM\\Offline，点击“文件” → “卸载配置单元”",
+		targetService, backupFile, driveLetterOnly, controlSet, targetService, currentStart)
+	if currentStart == "" {
+		msg = fmt.Sprintf(
+			"服务 %s 已修改为自动启动。\n\n备份文件已保存至：\n%s\n\n"+
+				"注意：该备份文件不能在 PE 中直接双击导入（会修改 PE 自身注册表）。\n"+
+				"如需回滚，请在 PE 中执行以下步骤：\n"+
+				"1. 打开注册表编辑器（regedit）\n"+
+				"2. 选中 HKEY_LOCAL_MACHINE，点击“文件” → “加载配置单元”\n"+
+				"3. 选择 %s:\\Windows\\System32\\config\\SYSTEM，加载为 HKLM\\Offline\n"+
+				"4. 将 HKLM\\Offline\\%s\\Services\\%s\\Start 修改为备份文件中的原值（备份文件中为 dword:00000003）\n"+
+				"5. 选中 HKLM\\Offline，点击“文件” → “卸载配置单元”",
 			targetService, backupFile, driveLetterOnly, controlSet, targetService)
 	}
 	MessageBox("注册表修改成功", msg, 0x40)
@@ -175,8 +325,16 @@ func FixRegistryOffline(driveLetter string, targetService string) error {
 }
 
 func FixSystemFileOffline(driveLetter string, fileName string, relativePath string) error {
+	// ===== 安全校验：目标必须位于 Windows 目录内，禁止路径穿越 =====
+	if !validFileName(fileName) {
+		return fmt.Errorf("文件名含非法字符: %q\n文件名不允许包含 \\ / : * ? \" < > |", fileName)
+	}
+	windowsRoot := filepath.Clean(driveLetter + ":\\Windows")
 	targetDir := driveLetter + ":\\Windows\\" + filepath.FromSlash(relativePath)
 	targetDir = filepath.Clean(targetDir)
+	if targetDir != windowsRoot && !strings.HasPrefix(strings.ToLower(targetDir), strings.ToLower(windowsRoot)+"\\") {
+		return fmt.Errorf("路径越界，已拒绝执行: %s\n目标必须位于 %s 目录内", targetDir, windowsRoot)
+	}
 	fullPath := filepath.Join(targetDir, fileName)
 
 	if err := os.MkdirAll(targetDir, 0755); err != nil {

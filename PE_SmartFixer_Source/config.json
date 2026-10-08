@@ -1,5 +1,5 @@
-﻿{
-  "api_key": "sk-你的百炼API密钥",
+{
+  "api_key": "sk-ws-H.EPERMPR.0WlF.MEQCIAkuR7oHBHwpV6xL9s89FINJ8Z7JprcYXvcsu2iVna5NAiAQ5oXvrSaVKeYy18OnJeLrdt3EJgN_LMabjwSYRkcJCw",
   "model": "qwen-vl-plus",
   "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
   "patch_server_url": "https://gitee.com/你的用户名/仓库名/raw/main/补丁目录",

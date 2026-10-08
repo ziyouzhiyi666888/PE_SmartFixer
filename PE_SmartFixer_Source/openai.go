@@ -45,6 +45,19 @@ type ChatResponse struct {
 	} `json:"error,omitempty"`
 }
 
+// buildSystemPrompt 组装系统提示词：内存级动态追加"历史禁区"负向强约束
+// （纯函数，便于测试；绝不改写本地静态 config.json）
+func buildSystemPrompt(base string, failedAction string) string {
+	if failedAction == "" {
+		return base
+	}
+	return base + fmt.Sprintf(
+		"\n【历史重症监护记录】：该系统在连续多轮诊断中，执行了 [%s] 复合修复工单（包含之前所有失败路径）全部失败，重启后依旧引导故障！"+
+			"这证明上述所有老路径全部错误！这次诊断时，你必须严格避开上述服务或该文件的所有相关重复操作，"+
+			"在概率分布层面横向全量封印失败路径。请你推翻之前的全部假设，深度审视蓝屏截图，"+
+			"彻底更换思维维度，给出全新的备用工单动作！", failedAction)
+}
+
 func CallQwenVLAPI(userText string, imagePaths []string) (string, error) {
 	if appConfig.APIKey == "" {
 		return "", fmt.Errorf("配置不完整：缺少 api_key")
@@ -61,6 +74,9 @@ func CallQwenVLAPI(userText string, imagePaths []string) (string, error) {
 	if systemPrompt == "" {
 		systemPrompt = "你是一名Windows系统维修专家。根据故障描述和截图返回严格JSON，格式：{\"risk_level\":\"SAFE|WARNING|CRITICAL\",\"user_desc\":\"大白话原因\",\"doc_action\":\"具体动作\"}，doc_action格式：REG|服务名 或 FILE|文件名|相对路径，多指令用;分隔。只返回JSON。"
 	}
+
+	// 【内存级多路复合负向强约束】不改 config.json，运行时动态追加历史禁区
+	systemPrompt = buildSystemPrompt(systemPrompt, globalFailedAction)
 
 	var content []ContentPart
 	if userText != "" {
