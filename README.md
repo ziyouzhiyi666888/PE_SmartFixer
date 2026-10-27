@@ -22,6 +22,14 @@
   - **环境幂等纯净**：启动时执行清理，修改前自动生成 `.reg` 备份，**备份失败则拒绝修改**。
   - **异步消息分发**：采用 `PostMessage` + 原子指针模型，有效规避跨线程野指针与死锁风险。
 
+---
+
+## 💬 遇到问题？进群聊
+
+用不明白、遇到报错、想提需求，都欢迎加群直接问：
+
+<img width="160" alt="PE-SmartFixer 官方 QQ 群二维码" src="https://github.com/user-attachments/assets/22a38a96-9494-4a26-843e-fd6d9c7dca1b" />
+
 ## 🛠️ 后续社区升级方向
 
 1. **本地离线视觉模型适配**：支持 MiniCPM-V / LLaVA 等轻量模型，实现无网环境下的视觉诊断。
@@ -286,4 +294,4 @@ A：**v1.1 已修复 32 位版的严重缺陷**（v1.0 的 386 版在 64 位 Win
 
 PE_SmartFixer 官方 QQ 群，欢迎进群交流、反馈问题、提建议。
 
-<img width="260" alt="PE-SmartFixer 官方 QQ 群二维码" src="https://github.com/user-attachments/assets/22a38a96-9494-4a26-843e-fd6d9c7dca1b" />
+<img width="240" alt="PE-SmartFixer 官方 QQ 群二维码" src="https://github.com/user-attachments/assets/22a38a96-9494-4a26-843e-fd6d9c7dca1b" />
