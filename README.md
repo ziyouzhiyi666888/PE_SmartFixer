@@ -1,10 +1,5 @@
 # 🚀 PE-SmartFixer：基于 AI 多模态视觉的 Windows PE 离线智能维护工具
 `版本: v1.1` │ `环境: WinPE` │ `核心: Go 语言 (无依赖)` │ `大脑: Qwen-VL (多模态 AI)` │ `协议: GPL-3.0 (开源)`
-PE_SmartFixer官方QQ群
-
-欢迎大家进群交流
-
-<img width="765" height="765" alt="qrcode_1793088524337" src="https://github.com/user-attachments/assets/22a38a96-9494-4a26-843e-fd6d9c7dca1b" />
 
 
 本工具彻底颠覆了传统 WinPE 维护需要手动查资料、改脚本的断裂体验。利用大模型多模态视觉（Vision）能力作为智能诊断入口，配合 Go 语言底层硬核掌控力，实现"看图识病，一步到位直接修机"。
@@ -33,8 +28,10 @@ PE_SmartFixer官方QQ群
 2. **蓝屏 DUMP 文件解析**：离线扫描 `.dmp` 文件，联合视觉进行双重诊断。
 3. **PECMD/INI 启动项智能优化**：扩展底层模块，支持对原系统外置加载项进行智能重组。
 4. **WMP 协议接入**：实现本项目提出的 [Windows 维护协议 (WMP)](WMP_SPEC_ZH.md) 标准化接口（stdin/stdout JSON-RPC + `wmp_manifest.json`），作为协议参考实现。
-<img width="1267" height="659" alt="QQ拼音截图未命名" src="https://github.com/user-attachments/assets/93055475-8a05-45c9-a82c-8d3caf41d51a" />
-<img width="1160" height="620" alt="image" src="https://github.com/user-attachments/assets/a4524415-a7a5-4a10-aaf2-945f45c5d601" />
+
+<img width="800" alt="PE-SmartFixer 主界面截图" src="https://github.com/user-attachments/assets/93055475-8a05-45c9-a82c-8d3caf41d51a" />
+
+<img width="800" alt="PE-SmartFixer 诊断修复过程截图" src="https://github.com/user-attachments/assets/a4524415-a7a5-4a10-aaf2-945f45c5d601" />
 
 
 ---
@@ -270,14 +267,23 @@ A：**v1.1 已修复 32 位版的严重缺陷**（v1.0 的 386 版在 64 位 Win
 - 支持注册表服务修复（REG|服务名）
 - 支持系统文件补全（FILE|文件名|相对路径）
 - 自动备份 + 回滚指引
-- 三级风险熔断机制（SAFE / WARNING / CRITICAL）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+- 三级风险熔断机制（SAFE / WARNING / CRITICAL）
 
 ## ☕ 支持作者
 
+如果你觉得这个工具帮到了你，欢迎请作者喝杯咖啡，让项目能持续维护下去 🙏
 
-如果你觉得这个工具帮到了你，欢迎请作者喝杯咖啡，让项目能持续维护下去 🙏                                                                                                                                                                           
-<img width="1260" height="1890" alt="微信图片_20261010125945_4_1" src="https://github.com/user-attachments/assets/0c3f45dd-2a43-4dcf-99a7-dd4a0c604481" />
-<img width="1490" height="2030" alt="微信图片_20261010125957_5_1" src="https://github.com/user-attachments/assets/832b0429-5a31-4d21-b928-78a94497596b" />
+<img width="260" alt="微信赞赏码" src="https://github.com/user-attachments/assets/0c3f45dd-2a43-4dcf-99a7-dd4a0c604481" />
+
+<img width="260" alt="支付宝赞赏码" src="https://github.com/user-attachments/assets/832b0429-5a31-4d21-b928-78a94497596b" />
 
 
 打赏纯属自愿，不影响任何功能使用。
+
+---
+
+## 💬 交流群
+
+PE_SmartFixer 官方 QQ 群，欢迎进群交流、反馈问题、提建议。
+
+<img width="260" alt="PE-SmartFixer 官方 QQ 群二维码" src="https://github.com/user-attachments/assets/22a38a96-9494-4a26-843e-fd6d9c7dca1b" />
