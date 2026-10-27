@@ -1,8 +1,10 @@
 # 🚀 PE-SmartFixer：基于 AI 多模态视觉的 Windows PE 离线智能维护工具
 `版本: v1.1` │ `环境: WinPE` │ `核心: Go 语言 (无依赖)` │ `大脑: Qwen-VL (多模态 AI)` │ `协议: GPL-3.0 (开源)`
 PE_SmartFixer官方QQ群
+
 欢迎大家进群交流
-<img width="1284" height="2283" alt="qrcode_1793088524337" src="https://github.com/user-attachments/assets/22a38a96-9494-4a26-843e-fd6d9c7dca1b" />
+
+<img width="1024" height="1024" alt="qrcode_1793088524337" src="https://github.com/user-attachments/assets/22a38a96-9494-4a26-843e-fd6d9c7dca1b" />
 
 
 本工具彻底颠覆了传统 WinPE 维护需要手动查资料、改脚本的断裂体验。利用大模型多模态视觉（Vision）能力作为智能诊断入口，配合 Go 语言底层硬核掌控力，实现"看图识病，一步到位直接修机"。
